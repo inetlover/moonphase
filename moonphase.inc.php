@@ -3,9 +3,6 @@ namespace TTREE;
 
 class moonphase {
 
-	// Error definition
-	const ERR_UNDEF = -1;
-
 	// Astronomical constants
 	const EPOCH = 2444238.5;
 
@@ -248,6 +245,7 @@ class moonphase {
 	 * @param float $k
 	 * @param float $phase
 	 * @return float
+	 * @throws \InvalidArgumentException
 	 */
 	function truephase($k, $phase) {
 		$apcor = 0;
@@ -326,8 +324,10 @@ class moonphase {
 			$apcor = 1;
 		}
 		if (!$apcor) {
-			print "truephase() called with invalid phase selector ($phase).\n";
-			exit(self::ERR_UNDEF);
+			throw new \InvalidArgumentException(
+				"truephase() called with invalid phase selector ($phase).",
+				1327449033
+			);
 		}
 		return ($pt);
 	}
@@ -364,7 +364,8 @@ class moonphase {
 			$k1 = $k2;
 		}
 
-		return array($this->jdaytosecs($this->truephase($k1, 0.0)),
+		return array(
+			$this->jdaytosecs($this->truephase($k1, 0.0)),
 			$this->jdaytosecs($this->truephase($k1, 0.25)),
 			$this->jdaytosecs($this->truephase($k1, 0.5)),
 			$this->jdaytosecs($this->truephase($k1, 0.75)),

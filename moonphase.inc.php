@@ -28,8 +28,8 @@ class moonphase {
 	/**
 	 * Phase Hunt
 	 */
-	function do_phasehunt() {
-		$phases = $this->phasehunt();
+	function calculatePhaseHunting() {
+		$phases = $this->phaseHunting(new \DateTime('now'));
 
 		print date("D M j G:i:s T Y", $phases[0]) . "\n";
 		print date("D M j G:i:s T Y", $phases[1]) . "\n";
@@ -42,16 +42,16 @@ class moonphase {
 	/**
 	 * Phase list
 	 *
-	 * @param $start
-	 * @param $stop
+	 * @param \DateTime $startDate
+	 * @param \DateTime $endDate
 	 */
-	function do_phaselist($start, $stop) {
+	function calculatePhaseList(\DateTime $startDate, \DateTime $endDate) {
 		$name = array("New Moon", "First quarter", "Full moon", "Last quarter");
-		$times = $this->phaselist($start, $stop);
+		$times = $this->findPhaseList($startDate, $endDate);
 
 		foreach ($times as $time) {
 
-			// First element is the starting phase (see $name).
+			// First element is the starting calculatePhase (see $name).
 			if ($time == $times[0]) {
 				print $name["$times[0]"] . "\n";
 			}
@@ -62,14 +62,12 @@ class moonphase {
 	}
 
 	/**
-	 * Calculate phase
+	 * Calculate calculatePhase
 	 *
-	 * @param int $date
-	 * @param int $time
-	 * @param string $tzone
+	 * @param \DateTime $date
 	 */
-	function do_phase($date, $time, $tzone) {
-		$moondata = $this->phase(strtotime($date . ' ' . $time . ' ' . $tzone));
+	function calculatePhaseByDate(\DateTime $date) {
+		$moondata = $this->calculatePhase($date);
 
 		$MoonIllum = $moondata[1];
 		$MoonAge = $moondata[2];
@@ -99,7 +97,7 @@ class moonphase {
 	 * @param float $arg
 	 * @return int
 	 */
-	function sgn($arg) {
+	function extractSign($arg) {
 		return (($arg < 0) ? -1 : ($arg > 0 ? 1 : 0));
 	}
 
@@ -109,7 +107,7 @@ class moonphase {
 	 * @param float $arg
 	 * @return float
 	 */
-	function fixangle($arg) {
+	function fixAngle($arg) {
 		return ($arg - 360.0 * (floor($arg / 360.0)));
 	}
 
@@ -119,7 +117,7 @@ class moonphase {
 	 * @param float $arg
 	 * @return float mixed
 	 */
-	function torad($arg) {
+	function degreeToRadiant($arg) {
 		return ($arg * (pi() / 180.0));
 	}
 
@@ -129,7 +127,7 @@ class moonphase {
 	 * @param float $arg
 	 * @return float mixed
 	 */
-	function todeg($arg) {
+	function radiantToDegree($arg) {
 		return ($arg * (180.0 / pi()));
 	}
 
@@ -139,8 +137,8 @@ class moonphase {
 	 * @param float $arg
 	 * @return float
 	 */
-	function dsin($arg) {
-		return (sin($this->torad($arg)));
+	function sinusFromRadian($arg) {
+		return sin($this->degreeToRadiant($arg));
 	}
 
 	/**
@@ -149,18 +147,19 @@ class moonphase {
 	 * @param float $arg
 	 * @return float
 	 */
-	function dcos($arg) {
-		return (cos($this->torad($arg)));
+	function cosinusFromDegree($arg) {
+		return cos($this->degreeToRadiant($arg));
 	}
 
 	/**
 	 * Convert internal date and time to astronomical Julian
 	 * time (i.e. Julian date plus day fraction)
 	 *
-	 * @param int $timestamp
+	 * @param \DateTime $date
 	 * @return float
 	 */
-	function jtime($timestamp) {
+	function convertDateToAstronomicalJulian(\DateTime $date) {
+		$timestamp = $date->getTimestamp();
 		$julian = ($timestamp / 86400) + 2440587.5; // (seconds / (seconds per day)) + julian date of epoch
 		return $julian;
 	}
@@ -171,21 +170,20 @@ class moonphase {
 	 * @param int $jday
 	 * @return int
 	 */
-	function jdaytosecs($jday = 0) {
+	function convertJulianDateToUNIXEpoc($jday = 0) {
 		$stamp = ($jday - 2440587.5) * 86400; // (juliandate - jdate of unix epoch) * (seconds per julian day)
 		return $stamp;
 	}
 
 	/**
-	 * Convert Julian date to year, month, day, which are
-	 * returned via integer pointers to integers
+	 * Convert Julian date to year, month, day
 	 *
 	 * @param float $td
 	 * @param int $yy
 	 * @param int $mm
 	 * @param int $dd
 	 */
-	function jyear($td, &$yy, &$mm, &$dd) {
+	function convertJulianDateToDateTime($td, &$yy, &$mm, &$dd) {
 		$td += 0.5; // astronomical to civil.
 		$z = floor($td);
 		$f = $td - $z;
@@ -222,7 +220,7 @@ class moonphase {
 	 * @param float $k
 	 * @return float
 	 */
-	function meanphase($sdate, $k) {
+	function calculateMeanphase($sdate, $k) {
 
 		// Time in Julian centuries from 1900 January 0.5
 		$t = ($sdate - 2415020.0) / 36525;
@@ -232,35 +230,35 @@ class moonphase {
 		$nt1 = 2415020.75933 + self::SYNMONTH * $k
 			+ 0.0001178 * $t2
 			- 0.000000155 * $t3
-			+ 0.00033 * $this->dsin(166.56 + 132.87 * $t - 0.009173 * $t2);
+			+ 0.00033 * $this->sinusFromRadian(166.56 + 132.87 * $t - 0.009173 * $t2);
 
 		return ($nt1);
 	}
 
 	/**
-	 * Given a K value used to determine the mean phase of the
-	 * new moon, and a phase selector (0.0, 0.25, 0.5, 0.75),
-	 * obtain the true, corrected phase time.
+	 * Given a K value used to determine the mean calculatePhase of the
+	 * new moon, and a calculatePhase selector (0.0, 0.25, 0.5, 0.75),
+	 * obtain the true, corrected calculatePhase time.
 	 *
 	 * @param float $k
 	 * @param float $phase
 	 * @return float
 	 * @throws \InvalidArgumentException
 	 */
-	function truephase($k, $phase) {
+	function calculateTruephase($k, $phase) {
 		$apcor = 0;
 
-		$k += $phase; // add phase to new moon time
+		$k += $phase; // add calculatePhase to new moon time
 		$t = $k / 1236.85; // time in Julian centuries from 1900 January 0.5
 		$t2 = $t * $t; // square for frequent use
 		$t3 = $t2 * $t; // cube for frequent use
 
-		// mean time of phase
+		// mean time of calculatePhase
 		$pt = 2415020.75933
 			+ self::SYNMONTH * $k
 			+ 0.0001178 * $t2
 			- 0.000000155 * $t3
-			+ 0.00033 * $this->dsin(166.56 + 132.87 * $t - 0.009173 * $t2);
+			+ 0.00033 * $this->sinusFromRadian(166.56 + 132.87 * $t - 0.009173 * $t2);
 
 		// Sun's mean anomaly
 		$m = 359.2242
@@ -282,50 +280,50 @@ class moonphase {
 
 		if (($phase < 0.01) || (abs($phase - 0.5) < 0.01)) {
 			// Corrections for New and Full Moon.
-			$pt += (0.1734 - 0.000393 * $t) * $this->dsin($m)
-				+ 0.0021 * $this->dsin(2 * $m)
-				- 0.4068 * $this->dsin($mprime)
-				+ 0.0161 * $this->dsin(2 * $mprime)
-				- 0.0004 * $this->dsin(3 * $mprime)
-				+ 0.0104 * $this->dsin(2 * $f)
-				- 0.0051 * $this->dsin($m + $mprime)
-				- 0.0074 * $this->dsin($m - $mprime)
-				+ 0.0004 * $this->dsin(2 * $f + $m)
-				- 0.0004 * $this->dsin(2 * $f - $m)
-				- 0.0006 * $this->dsin(2 * $f + $mprime)
-				+ 0.0010 * $this->dsin(2 * $f - $mprime)
-				+ 0.0005 * $this->dsin($m + 2 * $mprime);
+			$pt += (0.1734 - 0.000393 * $t) * $this->sinusFromRadian($m)
+				+ 0.0021 * $this->sinusFromRadian(2 * $m)
+				- 0.4068 * $this->sinusFromRadian($mprime)
+				+ 0.0161 * $this->sinusFromRadian(2 * $mprime)
+				- 0.0004 * $this->sinusFromRadian(3 * $mprime)
+				+ 0.0104 * $this->sinusFromRadian(2 * $f)
+				- 0.0051 * $this->sinusFromRadian($m + $mprime)
+				- 0.0074 * $this->sinusFromRadian($m - $mprime)
+				+ 0.0004 * $this->sinusFromRadian(2 * $f + $m)
+				- 0.0004 * $this->sinusFromRadian(2 * $f - $m)
+				- 0.0006 * $this->sinusFromRadian(2 * $f + $mprime)
+				+ 0.0010 * $this->sinusFromRadian(2 * $f - $mprime)
+				+ 0.0005 * $this->sinusFromRadian($m + 2 * $mprime);
 			$apcor = 1;
 		}
 		elseif ((abs($phase - 0.25) < 0.01 || (abs($phase - 0.75) < 0.01))) {
-			$pt += (0.1721 - 0.0004 * $t) * $this->dsin($m)
-				+ 0.0021 * $this->dsin(2 * $m)
-				- 0.6280 * $this->dsin($mprime)
-				+ 0.0089 * $this->dsin(2 * $mprime)
-				- 0.0004 * $this->dsin(3 * $mprime)
-				+ 0.0079 * $this->dsin(2 * $f)
-				- 0.0119 * $this->dsin($m + $mprime)
-				- 0.0047 * $this->dsin($m - $mprime)
-				+ 0.0003 * $this->dsin(2 * $f + $m)
-				- 0.0004 * $this->dsin(2 * $f - $m)
-				- 0.0006 * $this->dsin(2 * $f + $mprime)
-				+ 0.0021 * $this->dsin(2 * $f - $mprime)
-				+ 0.0003 * $this->dsin($m + 2 * $mprime)
-				+ 0.0004 * $this->dsin($m - 2 * $mprime)
-				- 0.0003 * $this->dsin(2 * $m + $mprime);
+			$pt += (0.1721 - 0.0004 * $t) * $this->sinusFromRadian($m)
+				+ 0.0021 * $this->sinusFromRadian(2 * $m)
+				- 0.6280 * $this->sinusFromRadian($mprime)
+				+ 0.0089 * $this->sinusFromRadian(2 * $mprime)
+				- 0.0004 * $this->sinusFromRadian(3 * $mprime)
+				+ 0.0079 * $this->sinusFromRadian(2 * $f)
+				- 0.0119 * $this->sinusFromRadian($m + $mprime)
+				- 0.0047 * $this->sinusFromRadian($m - $mprime)
+				+ 0.0003 * $this->sinusFromRadian(2 * $f + $m)
+				- 0.0004 * $this->sinusFromRadian(2 * $f - $m)
+				- 0.0006 * $this->sinusFromRadian(2 * $f + $mprime)
+				+ 0.0021 * $this->sinusFromRadian(2 * $f - $mprime)
+				+ 0.0003 * $this->sinusFromRadian($m + 2 * $mprime)
+				+ 0.0004 * $this->sinusFromRadian($m - 2 * $mprime)
+				- 0.0003 * $this->sinusFromRadian(2 * $m + $mprime);
 			if ($phase < 0.5) {
 				// First quarter correction.
-				$pt += 0.0028 - 0.0004 * $this->dcos($m) + 0.0003 * $this->dcos($mprime);
+				$pt += 0.0028 - 0.0004 * $this->cosinusFromDegree($m) + 0.0003 * $this->cosinusFromDegree($mprime);
 			}
 			else {
 				// Last quarter correction.
-				$pt += -0.0028 + 0.0004 * $this->dcos($m) - 0.0003 * $this->dcos($mprime);
+				$pt += -0.0028 + 0.0004 * $this->cosinusFromDegree($m) - 0.0003 * $this->cosinusFromDegree($mprime);
 			}
 			$apcor = 1;
 		}
 		if (!$apcor) {
 			throw new \InvalidArgumentException(
-				"truephase() called with invalid phase selector ($phase).",
+				"calculateTruephase() called with invalid phase selector ($phase).",
 				1327449033
 			);
 		}
@@ -337,26 +335,26 @@ class moonphase {
 	 * date.  Five phases are found, starting and ending with the
 	 * new moons which bound the current lunation
 	 *
-	 * @param int $time
+	 * @param \DateTime $date
 	 * @return array
 	 */
-	function phasehunt($time = -1) {
+	function phaseHunting(\DateTime $date) {
 
-		if (empty($time) || $time == -1) {
-			$time = time();
-		}
-		$sdate = $this->jtime($time);
+		$sdate = $this->convertDateToAstronomicalJulian($date);
 		$adate = $sdate - 45;
-		$this->jyear($adate, $yy, $mm, $dd);
+
+		$yy = $mm = $dd = 0;
+		$this->convertJulianDateToDateTime($adate, $yy, $mm, $dd);
+
 		$k1 = floor(($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685);
-		$adate = $nt1 = $this->meanphase($adate, $k1);
+		$adate = $nt1 = $this->calculateMeanphase($adate, $k1);
 
 		$k2 = $k1;
 
 		while (1) {
 			$adate += self::SYNMONTH;
 			$k2 = $k1 + 1;
-			$nt2 = $this->meanphase($adate, $k2);
+			$nt2 = $this->calculateMeanphase($adate, $k2);
 			if (($nt1 <= $sdate) && ($nt2 > $sdate)) {
 				break;
 			}
@@ -365,11 +363,11 @@ class moonphase {
 		}
 
 		return array(
-			$this->jdaytosecs($this->truephase($k1, 0.0)),
-			$this->jdaytosecs($this->truephase($k1, 0.25)),
-			$this->jdaytosecs($this->truephase($k1, 0.5)),
-			$this->jdaytosecs($this->truephase($k1, 0.75)),
-			$this->jdaytosecs($this->truephase($k2, 0.0))
+			$this->convertJulianDateToUNIXEpoc($this->calculateTruephase($k1, 0.0)),
+			$this->convertJulianDateToUNIXEpoc($this->calculateTruephase($k1, 0.25)),
+			$this->convertJulianDateToUNIXEpoc($this->calculateTruephase($k1, 0.5)),
+			$this->convertJulianDateToUNIXEpoc($this->calculateTruephase($k1, 0.75)),
+			$this->convertJulianDateToUNIXEpoc($this->calculateTruephase($k2, 0.0))
 		);
 	}
 
@@ -377,36 +375,32 @@ class moonphase {
 	 * Find time of phases of the moon between two dates.
 	 * Times (in & out) are seconds_since_1970
 	 *
-	 * @param int $sdate
-	 * @param int $edate
+	 * @param \DateTime $startDate
+	 * @param \DateTime $endDate
 	 * @return array
 	 */
-	function phaselist($sdate, $edate) {
-		if (empty($sdate) || empty($edate)) {
-			return array();
-		}
-
-		$sdate = $this->jtime($sdate);
-		$edate = $this->jtime($edate);
+	function findPhaseList(\DateTime $startDate, \DateTime $endDate) {
+		$startDate = $this->convertDateToAstronomicalJulian($startDate);
+		$endDate = $this->convertDateToAstronomicalJulian($endDate);
 
 		$phases = array();
 		$d = $k = $yy = $mm = 0;
 
-		$this->jyear($sdate, $yy, $mm, $d);
+		$this->convertJulianDateToDateTime($startDate, $yy, $mm, $d);
 		$k = floor(($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685) - 2;
 
 		while (1) {
 			++$k;
 			foreach (array(0.0, 0.25, 0.5, 0.75) as $phase) {
-				$d = $this->truephase($k, $phase);
-				if ($d >= $edate) {
+				$d = $this->calculateTruephase($k, $phase);
+				if ($d >= $endDate) {
 					return $phases;
 				}
-				if ($d >= $sdate) {
+				if ($d >= $startDate) {
 					if (empty($phases)) {
 						array_push($phases, floor(4 * $phase));
 					}
-					array_push($phases, $this->jdaytosecs($d));
+					array_push($phases, $this->convertJulianDateToUNIXEpoc($d));
 				}
 			}
 		}
@@ -421,9 +415,9 @@ class moonphase {
 	 * @param float $ecc
 	 * @return float
 	 */
-	function kepler($m, $ecc) {
+	function solveKeplerEquation($m, $ecc) {
 		$EPSILON = 1e-6;
-		$m = $this->torad($m);
+		$m = $this->degreeToRadiant($m);
 		$e = $m;
 		do {
 			$delta = $e - $ecc * sin($e) - $m;
@@ -433,25 +427,22 @@ class moonphase {
 	}
 
 	/**
-	 * Calculate phase of moon as a fraction:
+	 * Calculate calculatePhase of moon as a fraction:
 	 *
-	 * The argument is the time for which the phase is requested,
+	 * The argument is the time for which the calculatePhase is requested,
 	 * expressed as a Julian date and fraction.  Returns the terminator
-	 * phase angle as a percentage of a full circle (i.e., 0 to 1),
+	 * calculatePhase angle as a percentage of a full circle (i.e., 0 to 1),
 	 * and stores into pointer arguments the illuminated fraction of
 	 * the Moon's disc, the Moon's age in days and fraction, the
 	 * distance of the Moon from the centre of the Earth, and the
 	 * angular diameter subtended by the Moon as seen by an observer
 	 * at the centre of the Earth.
 	 *
-	 * @param int $time
+	 * @param \DateTime $date
 	 * @return array
 	 */
-	function phase($time = 0) {
-		if (empty($time) || $time == 0) {
-			$time = time();
-		}
-		$pdate = $this->jtime($time);
+	function calculatePhase(\DateTime $date) {
+		$date = $this->convertDateToAstronomicalJulian($date);
 
 		//	my ($Day, $N, $M, $Ec, $Lambdasun, $ml, $MM, $MN, $Ev, $Ae, $A3, $MmP,
 		//	   $mEc, $A4, $lP, $V, $lPP, $NP, $y, $x, $Lambdamoon, $BetaM,
@@ -461,16 +452,16 @@ class moonphase {
 		//	   $mpfrac);
 
 		// Calculation of the Sun's position.
-		$Day = $pdate - self::EPOCH; // date within epoch
-		$N = $this->fixangle((360 / 365.2422) * $Day); // mean anomaly of the Sun
-		$M = $this->fixangle($N + self::ELONGE - self::ELONGP); // convert from perigee co-ordinates
+		$Day = $date - self::EPOCH; // date within epoch
+		$N = $this->fixAngle((360 / 365.2422) * $Day); // mean anomaly of the Sun
+		$M = $this->fixAngle($N + self::ELONGE - self::ELONGP); // convert from perigee co-ordinates
 		//   to epoch 1980.0
-		$Ec = $this->kepler($M, self::ECCENT); // solve equation of Kepler
+		$Ec = $this->solveKeplerEquation($M, self::ECCENT); // solve equation of Kepler
 		$Ec = sqrt((1 + self::ECCENT) / (1 - self::ECCENT)) * tan($Ec / 2);
-		$Ec = 2 * $this->todeg(atan($Ec)); // true anomaly
-		$Lambdasun = $this->fixangle($Ec + self::ELONGP); // Sun's geocentric ecliptic longitude
+		$Ec = 2 * $this->radiantToDegree(atan($Ec)); // true anomaly
+		$Lambdasun = $this->fixAngle($Ec + self::ELONGP); // Sun's geocentric ecliptic longitude
 		# Orbital distance factor.
-		$F = ((1 + self::ECCENT * cos($this->torad($Ec))) / (1 - self::ECCENT * self::ECCENT));
+		$F = ((1 + self::ECCENT * cos($this->degreeToRadiant($Ec))) / (1 - self::ECCENT * self::ECCENT));
 		$SunDist = self::SUNSMAX / $F; // distance to Sun in km
 		$SunAng = $F * self::SUNANGSIZ; // Sun's angular size in degrees
 
@@ -478,68 +469,68 @@ class moonphase {
 		// Calculation of the Moon's position.
 
 		// Moon's mean longitude.
-		$ml = $this->fixangle(13.1763966 * $Day + self::MMLONG);
+		$ml = $this->fixAngle(13.1763966 * $Day + self::MMLONG);
 
 		// Moon's mean anomaly.
-		$MM = $this->fixangle($ml - 0.1114041 * $Day - self::MMLONGP);
+		$MM = $this->fixAngle($ml - 0.1114041 * $Day - self::MMLONGP);
 
 		// Moon's ascending node mean longitude.
-		$MN = $this->fixangle(self::MLNODE - 0.0529539 * $Day);
+		$MN = $this->fixAngle(self::MLNODE - 0.0529539 * $Day);
 
 		// Evection.
-		$Ev = 1.2739 * sin($this->torad(2 * ($ml - $Lambdasun) - $MM));
+		$Ev = 1.2739 * sin($this->degreeToRadiant(2 * ($ml - $Lambdasun) - $MM));
 
 		// Annual equation.
-		$Ae = 0.1858 * sin($this->torad($M));
+		$Ae = 0.1858 * sin($this->degreeToRadiant($M));
 
 		// Correction term.
-		$A3 = 0.37 * sin($this->torad($M));
+		$A3 = 0.37 * sin($this->degreeToRadiant($M));
 
 		// Corrected anomaly.
 		$MmP = $MM + $Ev - $Ae - $A3;
 
 		// Correction for the equation of the centre.
-		$mEc = 6.2886 * sin($this->torad($MmP));
+		$mEc = 6.2886 * sin($this->degreeToRadiant($MmP));
 
 		// Another correction term.
-		$A4 = 0.214 * sin($this->torad(2 * $MmP));
+		$A4 = 0.214 * sin($this->degreeToRadiant(2 * $MmP));
 
 		// Corrected longitude.
 		$lP = $ml + $Ev + $mEc - $Ae + $A4;
 
 		// Variation.
-		$V = 0.6583 * sin($this->torad(2 * ($lP - $Lambdasun)));
+		$V = 0.6583 * sin($this->degreeToRadiant(2 * ($lP - $Lambdasun)));
 
 		// True longitude.
 		$lPP = $lP + $V;
 
 		// Corrected longitude of the node.
-		$NP = $MN - 0.16 * sin($this->torad($M));
+		$NP = $MN - 0.16 * sin($this->degreeToRadiant($M));
 
 		// Y inclination coordinate.
-		$y = sin($this->torad($lPP - $NP)) * cos($this->torad(self::MINC));
+		$y = sin($this->degreeToRadiant($lPP - $NP)) * cos($this->degreeToRadiant(self::MINC));
 
 		// X inclination coordinate.
-		$x = cos($this->torad($lPP - $NP));
+		$x = cos($this->degreeToRadiant($lPP - $NP));
 
 		// Ecliptic longitude.
-		$Lambdamoon = $this->todeg(atan2($y, $x));
+		$Lambdamoon = $this->radiantToDegree(atan2($y, $x));
 		$Lambdamoon += $NP;
 
 		// Ecliptic latitude.
-		$BetaM = $this->todeg(asin(sin($this->torad($lPP - $NP)) * sin($this->torad(self::MINC))));
+		$BetaM = $this->radiantToDegree(asin(sin($this->degreeToRadiant($lPP - $NP)) * sin($this->degreeToRadiant(self::MINC))));
 
 
-		// Calculation of the phase of the Moon.
+		// Calculation of the calculatePhase of the Moon.
 
 		// Age of the Moon in degrees.
 		$MoonAge = $lPP - $Lambdasun;
 
 		// Phase of the Moon.
-		$MoonPhase = (1 - cos($this->torad($MoonAge))) / 2;
+		$MoonPhase = (1 - cos($this->degreeToRadiant($MoonAge))) / 2;
 
 		// Calculate distance of moon from the centre of the Earth.
-		$MoonDist = (self::MSMAX * (1 - self::MECC * self::MECC)) / (1 + self::MECC * cos($this->torad($MmP + $mEc)));
+		$MoonDist = (self::MSMAX * (1 - self::MECC * self::MECC)) / (1 + self::MECC * cos($this->degreeToRadiant($MmP + $mEc)));
 
 		// Calculate Moon's angular diameter.
 		$MoonDFrac = $MoonDist / self::MSMAX;
@@ -549,12 +540,12 @@ class moonphase {
 		$MoonPar = self::MPARALLAX / $MoonDFrac;
 
 		$pphase = $MoonPhase;
-		$mage = self::SYNMONTH * ($this->fixangle($MoonAge) / 360.0);
+		$mage = self::SYNMONTH * ($this->fixAngle($MoonAge) / 360.0);
 		$dist = $MoonDist;
 		$angdia = $MoonAng;
 		$sudist = $SunDist;
 		$suangdia = $SunAng;
-		$mpfrac = $this->fixangle($MoonAge) / 360.0;
+		$mpfrac = $this->fixAngle($MoonAge) / 360.0;
 
 		return array($mpfrac, $pphase, $mage, $dist, $angdia, $sudist, $suangdia);
 	}

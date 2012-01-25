@@ -1,9 +1,12 @@
+PHP Moonphase Library
+=====================
+
 OO Port of the MoonPhase script provided by:
 http://www.obsid.org/2008/05/calculate-moon-phase-data-with-php.html
 
-More improvement coming later ... currently just an OO wrapper around the existing function, the next step will be:
+Next step will be:
+------------------
 
-- Nicer API / Refactoring
 - Performance improvement
 - Add new features
 
